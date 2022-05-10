@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 
-	main "github.com/networkservicemesh/cmd-nse-icmp-responder"
+	main "github.com/networkservicemesh/cmd-nse-istio-proxy"
 )
 
 type TestSuite struct {

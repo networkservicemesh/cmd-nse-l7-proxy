@@ -1,4 +1,4 @@
-module github.com/networkservicemesh/cmd-nse-icmp-responder
+module github.com/networkservicemesh/cmd-nse-istio-proxy
 
 go 1.16
 

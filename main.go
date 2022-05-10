@@ -83,7 +83,7 @@ type Config struct {
 	BaseDir               string            `default:"./" desc:"base directory" split_words:"true"`
 	ConnectTo             url.URL           `default:"unix:///var/lib/networkservicemesh/nsm.io.sock" desc:"url to connect to" split_words:"true"`
 	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
-	ServiceNames          []string          `default:"icmp-responder" desc:"Name of provided services" split_words:"true"`
+	ServiceNames          []string          `default:"istio-proxy-responder" desc:"Name of provided services" split_words:"true"`
 	Payload               string            `default:"ETHERNET" desc:"Name of provided service payload" split_words:"true"`
 	Labels                map[string]string `default:"" desc:"Endpoint labels"`
 	DNSConfigs            dnstools.Decoder  `default:"[]" desc:"DNSConfigs represents array of DNSConfig in json format. See at model definition: https://github.com/networkservicemesh/api/blob/main/pkg/api/networkservice/connectioncontext.pb.go#L426-L435" split_words:"true"`

@@ -95,7 +95,7 @@ func (f *TestSuite) SetupSuite() {
 	// ********************************************************************************
 	log.FromContext(f.ctx).Infof("Running system under test (SUT) (time since start: %s)", time.Since(starttime))
 	// ********************************************************************************
-	cmdStr := "nse-icmp-responder"
+	cmdStr := "nse-istio-proxy"
 	f.sutErrCh = exechelper.Start(cmdStr,
 		exechelper.WithContext(f.ctx),
 		exechelper.WithEnvirons(os.Environ()...),
@@ -182,7 +182,7 @@ func runSpire(ctx context.Context) <-chan error {
 	}
 	spireErrCh := spire.Start(
 		spire.WithContext(ctx),
-		spire.WithEntry("spiffe://example.org/nse-icmp-responder", "unix:path:/bin/nse-icmp-responder"),
+		spire.WithEntry("spiffe://example.org/nse-istio-proxy", "unix:path:/bin/nse-istio-proxy"),
 		spire.WithEntry(fmt.Sprintf("spiffe://example.org/%s", filepath.Base(executable)),
 			fmt.Sprintf("unix:path:%s", executable),
 		),
