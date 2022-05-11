@@ -30,11 +30,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"time"
-
-	"gopkg.in/yaml.v2"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/edwarnicke/grpcfd"
@@ -49,6 +46,7 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/noop"
+	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/sdk-sriov/pkg/networkservice/common/token"
 	"github.com/networkservicemesh/sdk-sriov/pkg/tools/tokens"
@@ -60,7 +58,6 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/policyroute"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/ipam/point2pointipam"
@@ -68,7 +65,6 @@ import (
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
 	dnstools "github.com/networkservicemesh/sdk/pkg/tools/dnscontext"
-	"github.com/networkservicemesh/sdk/pkg/tools/fs"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
@@ -84,13 +80,10 @@ type Config struct {
 	ConnectTo             url.URL           `default:"unix:///var/lib/networkservicemesh/nsm.io.sock" desc:"url to connect to" split_words:"true"`
 	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
 	ServiceNames          []string          `default:"istio-proxy-responder" desc:"Name of provided services" split_words:"true"`
-	Payload               string            `default:"ETHERNET" desc:"Name of provided service payload" split_words:"true"`
 	Labels                map[string]string `default:"" desc:"Endpoint labels"`
 	DNSConfigs            dnstools.Decoder  `default:"[]" desc:"DNSConfigs represents array of DNSConfig in json format. See at model definition: https://github.com/networkservicemesh/api/blob/main/pkg/api/networkservice/connectioncontext.pb.go#L426-L435" split_words:"true"`
 	CidrPrefix            []string          `default:"169.254.0.0/16" desc:"List of CIDR Prefix to assign IPv4 and IPv6 addresses from" split_words:"true"`
 	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
-	RegisterService       bool              `default:"true" desc:"if true then registers network service on startup" split_words:"true"`
-	PBRConfigPath         string            `default:"/etc/policy-based-routing/config.yaml" desc:"Path to policy based routing config file" split_words:"true"`
 	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 }
@@ -208,7 +201,6 @@ func main() {
 		endpoint.WithAdditionalFunctionality(
 			onidle.NewServer(ctx, cancel, config.IdleTimeout),
 			ipamChain,
-			policyroute.NewServer(newPolicyRoutesGetter(ctx, config.PBRConfigPath).Get),
 			recvfd.NewServer(),
 			mechanisms.NewServer(map[string]networkservice.NetworkServiceServer{
 				kernelmech.MECHANISM: kernel.NewServer(),
@@ -216,6 +208,7 @@ func main() {
 			}),
 			tokenServer,
 			dnscontext.NewServer(config.DNSConfigs...),
+			//
 			sendfd.NewServer(),
 		),
 	)
@@ -260,17 +253,15 @@ func main() {
 		),
 	)
 
-	if config.RegisterService {
-		for _, serviceName := range config.ServiceNames {
-			nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx, &config.ConnectTo, registryclient.WithDialOptions(clientOptions...))
-			_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
-				Name:    serviceName,
-				Payload: config.Payload,
-			})
+	for _, serviceName := range config.ServiceNames {
+		nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx, &config.ConnectTo, registryclient.WithDialOptions(clientOptions...))
+		_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
+			Name:    serviceName,
+			Payload: payload.IP,
+		})
 
-			if err != nil {
-				log.FromContext(ctx).Fatalf("unable to register ns %+v", err)
-			}
+		if err != nil {
+			log.FromContext(ctx).Fatalf("unable to register ns %+v", err)
 		}
 	}
 
@@ -341,49 +332,6 @@ func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan erro
 		log.FromContext(ctx).Error(err)
 		cancel()
 	}(ctx, errCh)
-}
-
-// newPolicyRoutesGetter - watches the config file and dynamically updates policy routes.
-func newPolicyRoutesGetter(ctx context.Context, configPath string) *policyRoutesGetter {
-	p := &policyRoutesGetter{
-		ctx: ctx,
-	}
-	p.policyRoutes.Store([]*networkservice.PolicyRoute{})
-	updatePrefixes := func(bytes []byte) {
-		if bytes == nil {
-			p.policyRoutes.Store([]*networkservice.PolicyRoute{})
-		}
-		var source []*networkservice.PolicyRoute
-		err := yaml.Unmarshal(bytes, &source)
-		if err != nil {
-			log.FromContext(ctx).Errorf("Cannot unmarshal policies, err: %v", err.Error())
-			return
-		}
-		p.policyRoutes.Store(source)
-	}
-	updateCh := fs.WatchFile(p.ctx, configPath)
-	updatePrefixes(<-updateCh)
-	go func() {
-		for {
-			select {
-			case <-p.ctx.Done():
-				return
-			case update := <-updateCh:
-				updatePrefixes(update)
-			}
-		}
-	}()
-
-	return p
-}
-
-func (p *policyRoutesGetter) Get() []*networkservice.PolicyRoute {
-	return p.policyRoutes.Load().([]*networkservice.PolicyRoute)
-}
-
-type policyRoutesGetter struct {
-	ctx          context.Context
-	policyRoutes atomic.Value
 }
 
 func getIPAMChain(ctx context.Context, cIDRs []string) networkservice.NetworkServiceServer {
