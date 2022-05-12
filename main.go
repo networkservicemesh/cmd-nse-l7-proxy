@@ -48,6 +48,9 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/noop"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
+	"github.com/networkservicemesh/cmd-nse-istio-proxy/internal/pkg/dns"
+	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
+	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setroutelocalnet"
 	"github.com/networkservicemesh/sdk-sriov/pkg/networkservice/common/token"
 	"github.com/networkservicemesh/sdk-sriov/pkg/tools/tokens"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/endpoint"
@@ -144,6 +147,19 @@ func main() {
 	if err := config.Process(); err != nil {
 		logrus.Fatal(err.Error())
 	}
+
+	// TODO Fix for multiple clients
+	if len(config.CidrPrefix) != 1 {
+		logrus.Fatal("Only one CIDR prefix expected")
+	}
+	ip, _, err := net.ParseCIDR(config.CidrPrefix[0])
+	if err != nil {
+		logrus.Fatalf("parsing CIDR error: %s", err.Error())
+	}
+	if ip.To4() == nil {
+		logrus.Fatal("expected CIDR ipv4")
+	}
+
 	l, err := logrus.ParseLevel(config.LogLevel)
 	if err != nil {
 		logrus.Fatalf("invalid log level %s", config.LogLevel)
@@ -193,6 +209,11 @@ func main() {
 	// ********************************************************************************
 
 	tokenServer := getSriovTokenServerChainElement(ctx)
+	setRulesServer := getSetIPTablesRulesServerChainElement()
+
+	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
+		DnsServerIps: []string{ip.String()},
+	})
 
 	responderEndpoint := endpoint.NewServer(ctx,
 		spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime),
@@ -208,7 +229,8 @@ func main() {
 			}),
 			tokenServer,
 			dnscontext.NewServer(config.DNSConfigs...),
-			//
+			setroutelocalnet.NewServer(),
+			setRulesServer,
 			sendfd.NewServer(),
 		),
 	)
@@ -282,11 +304,27 @@ func main() {
 	}
 
 	// ********************************************************************************
+	log.FromContext(ctx).Infof("executing phase 7: run DNS server")
+	// ********************************************************************************
+
+	dnsServer := &dns.ProxyRewriteServer{
+		RewriteTO: ip,
+		ListenOn:  ":53",
+	}
+	errChan := dnsServer.ListenAndServe(ctx)
+
+	// ********************************************************************************
 	log.FromContext(ctx).Infof("startup completed in %v", time.Since(starttime))
 	// ********************************************************************************
 
 	// wait for server to exit
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case err = <-errChan:
+		log.FromContext(ctx).Error(err.Error())
+		<-ctx.Done()
+	}
+
 }
 
 func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkServiceEndpoint {
@@ -300,6 +338,22 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 		nse.NetworkServiceLabels[serviceName] = &registryapi.NetworkServiceLabels{Labels: config.Labels}
 	}
 	return nse
+}
+
+func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer {
+	defaultRules := []string{
+		"-N NSM_PREROUTE",
+		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
+		"-I PREROUTING 1 -p tcp -i {{ .NsmInterfaceName }} -j NSM_PREROUTE",
+		"-N NSM_OUTPUT",
+		"-A NSM_OUTPUT -j DNAT --to-destination {{ slice (index .NsmSrcIPs 0) 0 10 }}",
+		"-A OUTPUT -p tcp -s 127.0.0.6 -j NSM_OUTPUT",
+		"-N NSM_POSTROUTING",
+		"-A NSM_POSTROUTING -j SNAT --to-source {{ slice (index .NsmDstIPs 0) 0 10 }}",
+		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
+	}
+
+	return setiptables4nattemplate.NewServer(defaultRules)
 }
 
 func getSriovTokenServerChainElement(ctx context.Context) (tokenServer networkservice.NetworkServiceServer) {
