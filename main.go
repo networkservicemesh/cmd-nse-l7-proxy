@@ -45,7 +45,6 @@ import (
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/noop"
-	"github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/cmd-nse-istio-proxy/internal/pkg/dns"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
@@ -272,18 +271,6 @@ func main() {
 		),
 	)
 
-	for _, serviceName := range config.ServiceNames {
-		nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx, registryclient.WithClientURL(&config.ConnectTo), registryclient.WithDialOptions(clientOptions...))
-		_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
-			Name:    serviceName,
-			Payload: payload.IP,
-		})
-
-		if err != nil {
-			log.FromContext(ctx).Fatalf("unable to register ns %+v", err)
-		}
-	}
-
 	nseRegistryClient := registryclient.NewNetworkServiceEndpointRegistryClient(
 		ctx,
 		registryclient.WithClientURL(&config.ConnectTo),
@@ -307,17 +294,23 @@ func main() {
 		RewriteTO: ip,
 		ListenOn:  ":53",
 	}
-	errChan := dnsServer.ListenAndServe(ctx)
+
+	var dnsProxyErrCh = dnsServer.ListenAndServe(ctx)
 
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("startup completed in %v", time.Since(starttime))
 	// ********************************************************************************
+
 	// wait for server to exit
-	select {
-	case <-ctx.Done():
-	case err = <-errChan:
-		log.FromContext(ctx).Error(err.Error())
-		<-ctx.Done()
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-dnsProxyErrCh:
+			if err != nil {
+				log.FromContext(ctx).Errorf("ProxyRewriteServer: unexpected error: %v", err.Error())
+			}
+		}
 	}
 }
 
