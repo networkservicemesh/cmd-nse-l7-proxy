@@ -77,7 +77,7 @@ import (
 
 // Config holds configuration parameters from environment variables
 type Config struct {
-	Name                  string            `default:"icmp-server" desc:"Name of ICMP Server"`
+	Name                  string            `default:"istio-proxy-server" desc:"Name of Istio Proxy Server"`
 	BaseDir               string            `default:"./" desc:"base directory" split_words:"true"`
 	ConnectTo             url.URL           `default:"unix:///var/lib/networkservicemesh/nsm.io.sock" desc:"url to connect to" split_words:"true"`
 	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
