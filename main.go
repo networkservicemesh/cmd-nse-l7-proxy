@@ -1,5 +1,3 @@
-// Copyright (c) 2020-2022 Doc.ai and/or its affiliates.
-// Copyright (c) 2021-2022 Nordix and/or its affiliates.
 // Copyright (c) 2022 Xored Software Inc and others.
 //
 // SPDX-License-Identifier: Apache-2.0
@@ -200,7 +198,6 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 3: creating icmp server ipam")
 	// ********************************************************************************
-
 	ipamChain := getIPAMChain(ctx, config.CidrPrefix)
 
 	log.FromContext(ctx).Infof("network prefixes parsed successfully")
@@ -208,7 +205,6 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create icmp-server network service endpoint")
 	// ********************************************************************************
-
 	tokenServer := getSriovTokenServerChainElement(ctx)
 	setRulesServer := getSetIPTablesRulesServerChainElement()
 
@@ -307,7 +303,6 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 7: run DNS server")
 	// ********************************************************************************
-
 	dnsServer := &dns.ProxyRewriteServer{
 		RewriteTO: ip,
 		ListenOn:  ":53",
@@ -317,7 +312,6 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("startup completed in %v", time.Since(starttime))
 	// ********************************************************************************
-
 	// wait for server to exit
 	select {
 	case <-ctx.Done():
@@ -325,7 +319,6 @@ func main() {
 		log.FromContext(ctx).Error(err.Error())
 		<-ctx.Done()
 	}
-
 }
 
 func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkServiceEndpoint {

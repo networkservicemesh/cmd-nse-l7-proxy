@@ -17,7 +17,7 @@
 //go:build linux
 // +build linux
 
-// Package setiptables4nattemplate provides dns server with rewrite modification
+// Package dns provides dns server with rewrite modification
 package dns
 
 import (
@@ -51,12 +51,11 @@ func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 		server := &dns.Server{Addr: p.ListenOn, Net: network}
 		go func() {
 			server.Handler = p
-			defer server.Shutdown()
+			defer func() { _ = server.Shutdown() }()
 			select {
 			case result <- server.ListenAndServe():
 			case <-ctx.Done():
 			}
-
 		}()
 	}
 
