@@ -276,7 +276,7 @@ func main() {
 	)
 
 	for _, serviceName := range config.ServiceNames {
-		nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx, &config.ConnectTo, registryclient.WithDialOptions(clientOptions...))
+		nsRegistryClient := registryclient.NewNetworkServiceRegistryClient(ctx, registryclient.WithClientURL(&config.ConnectTo), registryclient.WithDialOptions(clientOptions...))
 		_, err = nsRegistryClient.Register(ctx, &registryapi.NetworkService{
 			Name:    serviceName,
 			Payload: payload.IP,
@@ -289,7 +289,7 @@ func main() {
 
 	nseRegistryClient := registryclient.NewNetworkServiceEndpointRegistryClient(
 		ctx,
-		&config.ConnectTo,
+		registryclient.WithClientURL(&config.ConnectTo),
 		registryclient.WithDialOptions(clientOptions...),
 		registryclient.WithNSEAdditionalFunctionality(
 			registrysendfd.NewNetworkServiceEndpointRegistryClient(),
