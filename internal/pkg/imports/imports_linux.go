@@ -12,7 +12,6 @@ import (
 	_ "github.com/networkservicemesh/api/pkg/api/networkservice"
 	_ "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
 	_ "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/noop"
-	_ "github.com/networkservicemesh/api/pkg/api/networkservice/payload"
 	_ "github.com/networkservicemesh/api/pkg/api/registry"
 	_ "github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
 	_ "github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setroutelocalnet"
@@ -52,6 +51,7 @@ import (
 	_ "os/signal"
 	_ "path/filepath"
 	_ "strings"
+	_ "sync"
 	_ "syscall"
 	_ "time"
 )

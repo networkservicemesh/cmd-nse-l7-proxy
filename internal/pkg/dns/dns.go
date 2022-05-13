@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/miekg/dns"
 )
@@ -40,6 +41,7 @@ type ProxyRewriteServer struct {
 func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 	var networks = []string{"tcp", "udp"}
 	var result = make(chan error, len(networks))
+	var waitGroup sync.WaitGroup
 
 	if p.RewriteTO == nil {
 		result <- errors.New("RewriteTO is not set")
@@ -47,17 +49,30 @@ func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 	if p.ResolveConfPath == "" {
 		p.ResolveConfPath = "/etc/resolv.conf"
 	}
+
 	for _, network := range networks {
-		server := &dns.Server{Addr: p.ListenOn, Net: network}
+		var server = &dns.Server{Addr: p.ListenOn, Net: network}
+		server.Handler = p
+
+		waitGroup.Add(1)
+
 		go func() {
-			server.Handler = p
-			defer func() { _ = server.Shutdown() }()
-			select {
-			case result <- server.ListenAndServe():
-			case <-ctx.Done():
+			defer waitGroup.Done()
+			defer func() {
+				_ = server.Shutdown()
+			}()
+			if err := server.ListenAndServe(); err != nil {
+				result <- err
 			}
+
+			<-ctx.Done()
 		}()
 	}
+
+	go func() {
+		waitGroup.Wait()
+		close(result)
+	}()
 
 	return result
 }
@@ -77,8 +92,6 @@ func (p *ProxyRewriteServer) ServeDNS(rw dns.ResponseWriter, m *dns.Msg) {
 		}
 		for _, addr := range config.Servers {
 			var msg *dns.Msg
-			fmt.Println(addr)
-			fmt.Println(network)
 			if msg, _, err = client.Exchange(m, fmt.Sprintf("%v:%v", addr, config.Port)); err != nil {
 				fmt.Println(err.Error())
 				continue
