@@ -131,8 +131,8 @@ func main() {
 	log.FromContext(ctx).Infof("the phases include:")
 	log.FromContext(ctx).Infof("1: get config from environment")
 	log.FromContext(ctx).Infof("2: retrieve spiffe svid")
-	log.FromContext(ctx).Infof("3: create icmp server ipam")
-	log.FromContext(ctx).Infof("4: create icmp server nse")
+	log.FromContext(ctx).Infof("3: create server ipam")
+	log.FromContext(ctx).Infof("4: create server nse")
 	log.FromContext(ctx).Infof("5: create grpc and mount nse")
 	log.FromContext(ctx).Infof("6: register nse with nsm")
 	log.FromContext(ctx).Infof("a final success message with start time duration")
@@ -196,14 +196,14 @@ func main() {
 	log.FromContext(ctx).Infof("SVID: %q", svid.ID)
 
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 3: creating icmp server ipam")
+	log.FromContext(ctx).Infof("executing phase 3: creating server ipam")
 	// ********************************************************************************
 	ipamChain := getIPAMChain(ctx, config.CidrPrefix)
 
 	log.FromContext(ctx).Infof("network prefixes parsed successfully")
 
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 4: create icmp-server network service endpoint")
+	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
 	tokenServer := getSriovTokenServerChainElement(ctx)
 	setRulesServer := getSetIPTablesRulesServerChainElement()
