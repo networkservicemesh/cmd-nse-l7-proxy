@@ -41,7 +41,7 @@ type ProxyRewriteServer struct {
 func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 	var networks = []string{"tcp", "udp"}
 	var result = make(chan error, len(networks))
-	var waitGrop sync.WaitGroup
+	var waitGroup sync.WaitGroup
 
 	if p.RewriteTO == nil {
 		result <- errors.New("RewriteTO is not set")
@@ -54,10 +54,10 @@ func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 		var server = &dns.Server{Addr: p.ListenOn, Net: network}
 		server.Handler = p
 
-		waitGrop.Add(1)
+		waitGroup.Add(1)
 
 		go func() {
-			defer waitGrop.Done()
+			defer waitGroup.Done()
 			defer func() {
 				_ = server.Shutdown()
 			}()
@@ -70,7 +70,7 @@ func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 	}
 
 	go func() {
-		waitGrop.Wait()
+		waitGroup.Wait()
 		close(result)
 	}()
 
