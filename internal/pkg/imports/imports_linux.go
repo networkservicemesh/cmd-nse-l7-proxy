@@ -15,8 +15,6 @@ import (
 	_ "github.com/networkservicemesh/api/pkg/api/registry"
 	_ "github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
 	_ "github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setroutelocalnet"
-	_ "github.com/networkservicemesh/sdk-sriov/pkg/networkservice/common/token"
-	_ "github.com/networkservicemesh/sdk-sriov/pkg/tools/tokens"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/chains/endpoint"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/authorize"
 	_ "github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms"
