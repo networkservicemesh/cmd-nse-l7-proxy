@@ -44,26 +44,23 @@ import (
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
-	"github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/noop"
 	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/cmd-nse-istio-proxy/internal/pkg/dns"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setroutelocalnet"
-	"github.com/networkservicemesh/sdk-sriov/pkg/networkservice/common/token"
-	"github.com/networkservicemesh/sdk-sriov/pkg/tools/tokens"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/chains/endpoint"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/authorize"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/kernel"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/recvfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/common/null"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/ipam/point2pointipam"
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
+	"github.com/networkservicemesh/sdk/pkg/tools/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
 	dnstools "github.com/networkservicemesh/sdk/pkg/tools/dnscontext"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
@@ -158,6 +155,8 @@ func main() {
 		logrus.Fatal("expected CIDR ipv4")
 	}
 
+	clientinfo.AddClientInfo(ctx, config.Labels)
+
 	l, err := logrus.ParseLevel(config.LogLevel)
 	if err != nil {
 		logrus.Fatalf("invalid log level %s", config.LogLevel)
@@ -204,7 +203,6 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-	tokenServer := getSriovTokenServerChainElement(ctx)
 	setRulesServer := getSetIPTablesRulesServerChainElement()
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
@@ -221,9 +219,7 @@ func main() {
 			recvfd.NewServer(),
 			mechanisms.NewServer(map[string]networkservice.NetworkServiceServer{
 				kernelmech.MECHANISM: kernel.NewServer(),
-				noop.MECHANISM:       null.NewServer(),
 			}),
-			tokenServer,
 			dnscontext.NewServer(config.DNSConfigs...),
 			setroutelocalnet.NewServer(),
 			setRulesServer,
@@ -295,7 +291,7 @@ func main() {
 		ListenOn:  ":53",
 	}
 
-	var dnsProxyErrCh = dnsServer.ListenAndServe(ctx)
+	var dnsServerErrCh = dnsServer.ListenAndServe(ctx)
 
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("startup completed in %v", time.Since(starttime))
@@ -306,9 +302,12 @@ func main() {
 		select {
 		case <-ctx.Done():
 			return
-		case err := <-dnsProxyErrCh:
+		case err, ok := <-dnsServerErrCh:
 			if err != nil {
 				log.FromContext(ctx).Errorf("ProxyRewriteServer: unexpected error: %v", err.Error())
+			}
+			if !ok {
+				return
 			}
 		}
 	}
@@ -333,31 +332,14 @@ func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer
 		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
 		"-I PREROUTING 1 -p tcp -i {{ .NsmInterfaceName }} -j NSM_PREROUTE",
 		"-N NSM_OUTPUT",
-		"-A NSM_OUTPUT -j DNAT --to-destination {{ slice (index .NsmSrcIPs 0) 0 10 }}",
+		"-A NSM_OUTPUT -j DNAT --to-destination {{ index .NsmSrcIPs 0 }}",
 		"-A OUTPUT -p tcp -s 127.0.0.6 -j NSM_OUTPUT",
 		"-N NSM_POSTROUTING",
-		"-A NSM_POSTROUTING -j SNAT --to-source {{ slice (index .NsmDstIPs 0) 0 10 }}",
+		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
 		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
 	}
 
 	return setiptables4nattemplate.NewServer(defaultRules)
-}
-
-func getSriovTokenServerChainElement(ctx context.Context) (tokenServer networkservice.NetworkServiceServer) {
-	sriovTokens := tokens.FromEnv(os.Environ())
-	switch len(sriovTokens) {
-	case 0:
-		tokenServer = null.NewServer()
-	case 1:
-		var tokenKey string
-		for tokenKey = range sriovTokens {
-			break
-		}
-		tokenServer = token.NewServer(tokenKey)
-	default:
-		log.FromContext(ctx).Fatalf("endpoint must be configured with none or only one sriov resource")
-	}
-	return
 }
 
 func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan error) {
