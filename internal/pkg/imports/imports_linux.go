@@ -42,6 +42,7 @@ import (
 	_ "google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
 	_ "io/ioutil"
+	_ "knative.dev/pkg/configmap"
 	_ "net"
 	_ "net/url"
 	_ "os"
