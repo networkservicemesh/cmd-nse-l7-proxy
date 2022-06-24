@@ -47,7 +47,7 @@ import (
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
-	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
+	registryapi "github.co m/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/cmd-nse-istio-proxy/internal/pkg/dns"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setroutelocalnet"
@@ -87,7 +87,7 @@ type Config struct {
 	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
-	RulesConfig           string            `default:"" desc: "Path to a configmap with iptables rules" split_words:"true"`
+	RulesConfig           string            `default:"" desc:"Path to a configmap with iptables rules" split_words:"true"`
 }
 
 // Process prints and processes env to config
@@ -207,8 +207,6 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-
-	fmt.Printf("%+v\n", config)
 	setRulesServer := getSetIPTablesRulesServerChainElement(config, ctx)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
@@ -338,7 +336,10 @@ func getSetIPTablesRulesServerChainElement(config *Config, ctx context.Context) 
 		log.FromContext(ctx).Error(err)
 	}
 	var myConfig sets.String
-	configmap.Parse(cfg, configmap.AsStringSet(config.RulesConfig, &myConfig))
+	err2 := configmap.Parse(cfg, configmap.AsStringSet(config.RulesConfig, &myConfig))
+	if err2 != nil {
+		log.FromContext(ctx).Error(err2)
+	}
 
 	defaultRules := myConfig.List()
 
