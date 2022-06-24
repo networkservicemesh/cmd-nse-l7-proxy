@@ -47,7 +47,7 @@ import (
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
-	registryapi "github.co m/networkservicemesh/api/pkg/api/registry"
+	registryapi "github.com/networkservicemesh/api/pkg/api/registry"
 	"github.com/networkservicemesh/cmd-nse-istio-proxy/internal/pkg/dns"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setiptables4nattemplate"
 	"github.com/networkservicemesh/sdk-kernel/pkg/kernel/networkservice/setroutelocalnet"
