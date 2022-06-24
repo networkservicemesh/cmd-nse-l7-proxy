@@ -206,7 +206,7 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-	setRulesServer := getSetIPTablesRulesServerChainElement(config, ctx)
+	setRulesServer := getSetIPTablesRulesServerChainElement(ctx, config)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
 		DnsServerIps: []string{ip.String()},
@@ -329,7 +329,7 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 	return nse
 }
 
-func getSetIPTablesRulesServerChainElement(config *Config, ctx context.Context) networkservice.NetworkServiceServer {
+func getSetIPTablesRulesServerChainElement(ctx context.Context, config *Config) networkservice.NetworkServiceServer {
 	cfg, err := configmap.Load(config.RulesConfig)
 	if err != nil {
 		log.FromContext(ctx).Error(err)
