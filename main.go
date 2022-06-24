@@ -32,7 +32,6 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"knative.dev/pkg/configmap"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
@@ -335,15 +334,12 @@ func getSetIPTablesRulesServerChainElement(config *Config, ctx context.Context) 
 	if err != nil {
 		log.FromContext(ctx).Error(err)
 	}
-	var myConfig sets.String
-	err2 := configmap.Parse(cfg, configmap.AsStringSet(config.RulesConfig, &myConfig))
-	if err2 != nil {
-		log.FromContext(ctx).Error(err2)
+	rules := strings.Split(cfg[config.RulesConfig], ",")
+	for i := range rules {
+		rules[i] = strings.TrimSpace(rules[i])
 	}
 
-	defaultRules := myConfig.List()
-
-	return setiptables4nattemplate.NewServer(defaultRules)
+	return setiptables4nattemplate.NewServer(rules)
 }
 
 func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan error) {
