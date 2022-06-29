@@ -31,7 +31,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
+    "gopkg.in/yaml.v2"
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/edwarnicke/grpcfd"
 	"github.com/kelseyhightower/envconfig"
@@ -84,6 +84,7 @@ type Config struct {
 	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
+	RulesConfigPath       string            `default:"" desc:"Path to a configmap with iptables rules" split_words:"true"`
 }
 
 // Process prints and processes env to config
@@ -203,7 +204,7 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-	setRulesServer := getSetIPTablesRulesServerChainElement()
+	setRulesServer := getSetIPTablesRulesServerChainElement(ctx, config)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
 		DnsServerIps: []string{ip.String()},
@@ -326,20 +327,21 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 	return nse
 }
 
-func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer {
-	defaultRules := []string{
-		"-N NSM_PREROUTE",
-		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
-		"-I PREROUTING 1 -p tcp -i {{ .NsmInterfaceName }} -j NSM_PREROUTE",
-		"-N NSM_OUTPUT",
-		"-A NSM_OUTPUT -j DNAT --to-destination {{ index .NsmSrcIPs 0 }}",
-		"-A OUTPUT -p tcp -s 127.0.0.6 -j NSM_OUTPUT",
-		"-N NSM_POSTROUTING",
-		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
-		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
+func getSetIPTablesRulesServerChainElement(ctx context.Context, config *Config) networkservice.NetworkServiceServer {
+	cfg, err := ioutil.ReadFile(config.RulesConfigPath)
+	if err != nil {
+		log.FromContext(ctx).Error(err)
+	}
+	var rules []string
+	err2 := yaml.Unmarshal(cfg, &rules)
+	if err2 != nil {
+		log.FromContext(ctx).Error(err2)
+	}
+	for k, v := range rules {
+		rules[k] = strings.TrimSpace(v)
 	}
 
-	return setiptables4nattemplate.NewServer(defaultRules)
+	return setiptables4nattemplate.NewServer(rules)
 }
 
 func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan error) {

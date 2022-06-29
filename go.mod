@@ -14,6 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spiffe/go-spiffe/v2 v2.0.0
 	google.golang.org/grpc v1.42.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -56,5 +57,4 @@ require (
 	google.golang.org/genproto v0.0.0-20211129164237-f09f9a12af12 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.4.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
