@@ -22,16 +22,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/url"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"strings"
-	"syscall"
-	"time"
-    "gopkg.in/yaml.v2"
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/edwarnicke/grpcfd"
 	"github.com/kelseyhightower/envconfig"
@@ -41,6 +31,16 @@ import (
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
+	"net"
+	"net/url"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
@@ -328,14 +328,27 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 }
 
 func getSetIPTablesRulesServerChainElement(ctx context.Context, config *Config) networkservice.NetworkServiceServer {
+	defaultRules := []string{
+		"-N NSM_PREROUTE",
+		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
+		"-I PREROUTING 1 -p tcp -i {{ .NsmInterfaceName }} -j NSM_PREROUTE",
+		"-N NSM_OUTPUT",
+		"-A NSM_OUTPUT -j DNAT --to-destination {{ index .NsmSrcIPs 0 }}",
+		"-A OUTPUT -p tcp -s 127.0.0.6 -j NSM_OUTPUT",
+		"-N NSM_POSTROUTING",
+		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
+		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
+	}
 	cfg, err := ioutil.ReadFile(config.RulesConfigPath)
 	if err != nil {
 		log.FromContext(ctx).Error(err)
+		return setiptables4nattemplate.NewServer(defaultRules)
 	}
 	var rules []string
 	err2 := yaml.Unmarshal(cfg, &rules)
 	if err2 != nil {
 		log.FromContext(ctx).Error(err2)
+		return setiptables4nattemplate.NewServer(defaultRules)
 	}
 	for k, v := range rules {
 		rules[k] = strings.TrimSpace(v)
