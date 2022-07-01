@@ -206,7 +206,6 @@ func main() {
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
 	rules := getIPTablesRules(ctx, config.RulesConfigPath)
-	setRulesServer := setiptables4nattemplate.NewServer(rules)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
 		DnsServerIps: []string{ip.String()},
@@ -225,7 +224,7 @@ func main() {
 			}),
 			dnscontext.NewServer(config.DNSConfigs...),
 			setroutelocalnet.NewServer(),
-			setRulesServer,
+			setiptables4nattemplate.NewServer(rules),
 			sendfd.NewServer(),
 		),
 	)
@@ -343,13 +342,12 @@ func getIPTablesRules(ctx context.Context, path string) []string {
 	}
 	cfg, err := ioutil.ReadFile(filepath.Clean(path))
 	if err != nil {
-		log.FromContext(ctx).Error(err)
+		log.FromContext(ctx).Errorf("Could not read IP tables config: %v", err)
 		return defaultRules
 	}
 	var rules []string
-	err2 := yaml.Unmarshal(cfg, &rules)
-	if err2 != nil {
-		log.FromContext(ctx).Error(err2)
+	if err = yaml.Unmarshal(cfg, &rules); err != nil {
+		log.FromContext(ctx).Errorf("Could not parse IP tables config: %v", err)
 		return defaultRules
 	}
 	for k, v := range rules {
