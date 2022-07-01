@@ -341,7 +341,7 @@ func getIPTablesRules(ctx context.Context, path string) []string {
 		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
 		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
 	}
-	cfg, err := ioutil.ReadFile(path)
+	cfg, err := ioutil.ReadFile(filepath.Clean(path))
 	if err != nil {
 		log.FromContext(ctx).Error(err)
 		return defaultRules
