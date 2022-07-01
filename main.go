@@ -205,7 +205,8 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-	setRulesServer := getSetIPTablesRulesServerChainElement(ctx, config)
+	rules := getIPTablesRules(ctx, config.RulesConfigPath)
+	setRulesServer := setiptables4nattemplate.NewServer(rules)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
 		DnsServerIps: []string{ip.String()},
@@ -328,7 +329,7 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 	return nse
 }
 
-func getSetIPTablesRulesServerChainElement(ctx context.Context, config *Config) networkservice.NetworkServiceServer {
+func getIPTablesRules(ctx context.Context, path string) []string {
 	defaultRules := []string{
 		"-N NSM_PREROUTE",
 		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
@@ -340,22 +341,22 @@ func getSetIPTablesRulesServerChainElement(ctx context.Context, config *Config) 
 		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
 		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
 	}
-	cfg, err := ioutil.ReadFile(config.RulesConfigPath)
+	cfg, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.FromContext(ctx).Error(err)
-		return setiptables4nattemplate.NewServer(defaultRules)
+		return defaultRules
 	}
 	var rules []string
 	err2 := yaml.Unmarshal(cfg, &rules)
 	if err2 != nil {
 		log.FromContext(ctx).Error(err2)
-		return setiptables4nattemplate.NewServer(defaultRules)
+		return defaultRules
 	}
 	for k, v := range rules {
 		rules[k] = strings.TrimSpace(v)
 	}
 
-	return setiptables4nattemplate.NewServer(rules)
+	return rules
 }
 
 func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan error) {
