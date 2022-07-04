@@ -41,6 +41,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"gopkg.in/yaml.v2"
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
@@ -84,6 +85,7 @@ type Config struct {
 	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
+	RulesConfigPath       string            `default:"" desc:"Path to a configmap with iptables rules" split_words:"true"`
 }
 
 // Process prints and processes env to config
@@ -203,7 +205,7 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-	setRulesServer := getSetIPTablesRulesServerChainElement()
+	rules := getIPTablesRules(ctx, config.RulesConfigPath)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
 		DnsServerIps: []string{ip.String()},
@@ -222,7 +224,7 @@ func main() {
 			}),
 			dnscontext.NewServer(config.DNSConfigs...),
 			setroutelocalnet.NewServer(),
-			setRulesServer,
+			setiptables4nattemplate.NewServer(rules),
 			sendfd.NewServer(),
 		),
 	)
@@ -326,7 +328,7 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 	return nse
 }
 
-func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer {
+func getIPTablesRules(ctx context.Context, path string) []string {
 	defaultRules := []string{
 		"-N NSM_PREROUTE",
 		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
@@ -338,8 +340,21 @@ func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer
 		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
 		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
 	}
+	cfg, err := ioutil.ReadFile(filepath.Clean(path))
+	if err != nil {
+		log.FromContext(ctx).Errorf("Could not read IP tables config: %v", err)
+		return defaultRules
+	}
+	var rules []string
+	if err = yaml.Unmarshal(cfg, &rules); err != nil {
+		log.FromContext(ctx).Errorf("Could not parse IP tables config: %v", err)
+		return defaultRules
+	}
+	for k, v := range rules {
+		rules[k] = strings.TrimSpace(v)
+	}
 
-	return setiptables4nattemplate.NewServer(defaultRules)
+	return rules
 }
 
 func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan error) {

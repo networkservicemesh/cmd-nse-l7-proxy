@@ -41,6 +41,7 @@ import (
 	_ "github.com/spiffe/go-spiffe/v2/workloadapi"
 	_ "google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
+	_ "gopkg.in/yaml.v2"
 	_ "io/ioutil"
 	_ "net"
 	_ "net/url"
