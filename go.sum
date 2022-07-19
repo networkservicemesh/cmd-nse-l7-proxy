@@ -107,8 +107,8 @@ github.com/networkservicemesh/api v1.4.1-0.20220711153918-a59689088578 h1:2MZD6S
 github.com/networkservicemesh/api v1.4.1-0.20220711153918-a59689088578/go.mod h1:hOF2844BSstH1311oDMDgqqXS+kdc77htZNPRKl9mf8=
 github.com/networkservicemesh/sdk v1.4.0 h1:ipVjmmjWYhnYvpo4N78JEOg7tjLB+DhYyyKbsJf5wPg=
 github.com/networkservicemesh/sdk v1.4.0/go.mod h1:7cS1AlEYjHHUP60XvWBEv0tmVnIXaxMFgounaZgDmQk=
-github.com/networkservicemesh/sdk-kernel v0.0.0-20220718011944-ae3739e17d28 h1:Jm/dvFNGVbcQChd5szckCW4u9bZZMQGqhKdsUx3OZOs=
-github.com/networkservicemesh/sdk-kernel v0.0.0-20220718011944-ae3739e17d28/go.mod h1:XOvog7IIINs+8sWp64fdJ4M0GnndChO1OgAecfR6zjs=
+github.com/networkservicemesh/sdk-kernel v0.0.0-20220719140715-5672a60b9aa3 h1:EEU9dHmKFGV6nxTYzkJ8q8svQAhuWVKH1pY/uqeB0Xg=
+github.com/networkservicemesh/sdk-kernel v0.0.0-20220719140715-5672a60b9aa3/go.mod h1:sxfMt9lMnjjdQeYB1wLRqeqtq5kLrB0VkOz0iXdrwKg=
 github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/open-policy-agent/opa v0.16.1 h1:BDADmi1Xl08aPcubaYgSEU0lJ/zrWDwmFMRXVPX856c=
 github.com/open-policy-agent/opa v0.16.1/go.mod h1:P0xUE/GQAAgnvV537GzA0Ikw4+icPELRT327QJPkaKY=
