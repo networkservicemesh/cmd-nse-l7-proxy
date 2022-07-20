@@ -28,7 +28,7 @@ import (
 	_ "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/clientinfo"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/debug"
-	_ "github.com/networkservicemesh/sdk/pkg/tools/dnscontext"
+	_ "github.com/networkservicemesh/sdk/pkg/tools/dnsconfig"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/log"
 	_ "github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
