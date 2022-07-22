@@ -25,10 +25,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/miekg/dns"
 )
+
+const dnsQuestionNameFilter = "cluster.local."
 
 // ProxyRewriteServer - DNS server with rewrite function
 type ProxyRewriteServer struct {
@@ -79,6 +82,14 @@ func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
 
 // ServeDNS - serve DNS request
 func (p *ProxyRewriteServer) ServeDNS(rw dns.ResponseWriter, m *dns.Msg) {
+	// We don't need to handle requests that don't belong to the filter
+	if !strings.HasSuffix(m.Question[0].Name, dnsQuestionNameFilter) {
+		dns.HandleFailed(rw, m)
+		return
+	}
+
+	m.RecursionDesired = false
+
 	config, err := dns.ClientConfigFromFile(p.ResolveConfPath)
 	if err != nil {
 		dns.HandleFailed(rw, m)
