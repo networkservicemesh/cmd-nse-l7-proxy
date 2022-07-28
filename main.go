@@ -41,6 +41,7 @@ import (
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"gopkg.in/yaml.v2"
 
 	"github.com/networkservicemesh/api/pkg/api/networkservice"
 	kernelmech "github.com/networkservicemesh/api/pkg/api/networkservice/mechanisms/kernel"
@@ -62,7 +63,7 @@ import (
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/tools/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
-	dnstools "github.com/networkservicemesh/sdk/pkg/tools/dnscontext"
+	"github.com/networkservicemesh/sdk/pkg/tools/dnsconfig"
 	"github.com/networkservicemesh/sdk/pkg/tools/grpcutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
@@ -81,11 +82,12 @@ type Config struct {
 	MaxTokenLifetime      time.Duration     `default:"10m" desc:"maximum lifetime of tokens" split_words:"true"`
 	ServiceNames          []string          `default:"istio-proxy-responder" desc:"Name of provided services" split_words:"true"`
 	Labels                map[string]string `default:"" desc:"Endpoint labels"`
-	DNSConfigs            dnstools.Decoder  `default:"[]" desc:"DNSConfigs represents array of DNSConfig in json format. See at model definition: https://github.com/networkservicemesh/api/blob/main/pkg/api/networkservice/connectioncontext.pb.go#L426-L435" split_words:"true"`
+	DNSConfigs            dnsconfig.Decoder `default:"[]" desc:"DNSConfigs represents array of DNSConfig in json format. See at model definition: https://github.com/networkservicemesh/api/blob/main/pkg/api/networkservice/connectioncontext.pb.go#L426-L435" split_words:"true"`
 	CidrPrefix            []string          `default:"169.254.0.0/16" desc:"List of CIDR Prefix to assign IPv4 and IPv6 addresses from" split_words:"true"`
 	IdleTimeout           time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	LogLevel              string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
+	RulesConfigPath       string            `default:"" desc:"Path to a configmap with iptables rules" split_words:"true"`
 }
 
 // Process prints and processes env to config
@@ -205,7 +207,7 @@ func main() {
 	// ********************************************************************************
 	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
 	// ********************************************************************************
-	setRulesServer := getSetIPTablesRulesServerChainElement()
+	rules := getIPTablesRules(ctx, config.RulesConfigPath)
 
 	config.DNSConfigs = append(config.DNSConfigs, &networkservice.DNSConfig{
 		DnsServerIps: []string{ip.String()},
@@ -225,7 +227,7 @@ func main() {
 			}),
 			dnscontext.NewServer(config.DNSConfigs...),
 			setroutelocalnet.NewServer(),
-			setRulesServer,
+			setiptables4nattemplate.NewServer(rules),
 			sendfd.NewServer(),
 		),
 	)
@@ -329,7 +331,7 @@ func getNseEndpoint(config *Config, listenOn fmt.Stringer) *registryapi.NetworkS
 	return nse
 }
 
-func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer {
+func getIPTablesRules(ctx context.Context, path string) []string {
 	defaultRules := []string{
 		"-N NSM_PREROUTE",
 		"-A NSM_PREROUTE -j ISTIO_REDIRECT",
@@ -341,8 +343,21 @@ func getSetIPTablesRulesServerChainElement() networkservice.NetworkServiceServer
 		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
 		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
 	}
+	cfg, err := ioutil.ReadFile(filepath.Clean(path))
+	if err != nil {
+		log.FromContext(ctx).Errorf("Could not read IP tables config: %v", err)
+		return defaultRules
+	}
+	var rules []string
+	if err = yaml.Unmarshal(cfg, &rules); err != nil {
+		log.FromContext(ctx).Errorf("Could not parse IP tables config: %v", err)
+		return defaultRules
+	}
+	for k, v := range rules {
+		rules[k] = strings.TrimSpace(v)
+	}
 
-	return setiptables4nattemplate.NewServer(defaultRules)
+	return rules
 }
 
 func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan error) {
