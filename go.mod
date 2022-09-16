@@ -8,8 +8,8 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.50
 	github.com/networkservicemesh/api v1.4.1-0.20220711153918-a59689088578
-	github.com/networkservicemesh/sdk v0.5.1-0.20220915185734-b47cbd4fcbfa
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20220915190118-1642d2c2c184
+	github.com/networkservicemesh/sdk v0.5.1-0.20220916121847-88b2169efe99
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20220916122524-6eea9a4500eb
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spiffe/go-spiffe/v2 v2.0.0
