@@ -42,7 +42,7 @@ type ProxyRewriteServer struct {
 
 // ListenAndServe - run DNS server
 func (p *ProxyRewriteServer) ListenAndServe(ctx context.Context) <-chan error {
-	var networks = []string{"tcp", "udp"}
+	var networks = []string{"udp"}
 	var result = make(chan error, len(networks))
 	var waitGroup sync.WaitGroup
 
