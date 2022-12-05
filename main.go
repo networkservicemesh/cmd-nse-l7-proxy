@@ -60,6 +60,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/ipam/point2pointipam"
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
+	registryauthorize "github.com/networkservicemesh/sdk/pkg/registry/common/authorize"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/tools/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
@@ -69,6 +70,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
 	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
 	"github.com/networkservicemesh/sdk/pkg/tools/spiffejwt"
+	"github.com/networkservicemesh/sdk/pkg/tools/token"
 	"github.com/networkservicemesh/sdk/pkg/tools/tracing"
 )
 
@@ -259,7 +261,9 @@ func main() {
 	clientOptions := append(
 		tracing.WithTracingDial(),
 		grpc.WithBlock(),
-		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+		grpc.WithDefaultCallOptions(
+			grpc.WaitForReady(true),
+			grpc.PerRPCCredentials(token.NewPerRPCCredentials(spiffejwt.TokenGeneratorFunc(source, config.MaxTokenLifetime)))),
 		grpc.WithTransportCredentials(
 			grpcfd.TransportCredentials(
 				credentials.NewTLS(
@@ -267,6 +271,8 @@ func main() {
 				),
 			),
 		),
+		grpcfd.WithChainStreamInterceptor(),
+		grpcfd.WithChainUnaryInterceptor(),
 	)
 
 	nseRegistryClient := registryclient.NewNetworkServiceEndpointRegistryClient(
@@ -274,8 +280,8 @@ func main() {
 		registryclient.WithClientURL(&config.ConnectTo),
 		registryclient.WithDialOptions(clientOptions...),
 		registryclient.WithNSEAdditionalFunctionality(
-			registrysendfd.NewNetworkServiceEndpointRegistryClient(),
-		),
+			registrysendfd.NewNetworkServiceEndpointRegistryClient()),
+		registryclient.WithAuthorizeNSERegistryClient(registryauthorize.NewNetworkServiceEndpointRegistryClient()),
 	)
 	nse := getNseEndpoint(config, listenOn)
 	nse, err = nseRegistryClient.Register(ctx, nse)
