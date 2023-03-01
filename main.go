@@ -89,6 +89,7 @@ type Config struct {
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
 	RulesConfigPath        string            `default:"" desc:"Path to a configmap with iptables rules" split_words:"true"`
+	RewriteIP              bool              `default:"false" desc:"Rewrite ip with nse-l7-proxy ip in DNS response" split_worlds:"true"`
 }
 
 // Process prints and processes env to config
@@ -298,6 +299,7 @@ func main() {
 	log.FromContext(ctx).Infof("executing phase 7: run DNS server")
 	// ********************************************************************************
 	dnsServer := &dns.ProxyRewriteServer{
+		RewriteIP: config.RewriteIP,
 		RewriteTO: ip,
 		ListenOn:  ":53",
 	}

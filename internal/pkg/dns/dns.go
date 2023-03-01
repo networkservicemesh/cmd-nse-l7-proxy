@@ -35,6 +35,7 @@ const dnsQuestionNameFilter = "cluster.local."
 
 // ProxyRewriteServer - DNS server with rewrite function
 type ProxyRewriteServer struct {
+	RewriteIP       bool
 	RewriteTO       net.IP
 	ListenOn        string
 	ResolveConfPath string
@@ -95,7 +96,7 @@ func (p *ProxyRewriteServer) ServeDNS(rw dns.ResponseWriter, m *dns.Msg) {
 		dns.HandleFailed(rw, m)
 		return
 	}
-	var networks = []string{"tcp", "udp"}
+	var networks = []string{"udp"}
 
 	for _, network := range networks {
 		var client = dns.Client{
@@ -107,9 +108,16 @@ func (p *ProxyRewriteServer) ServeDNS(rw dns.ResponseWriter, m *dns.Msg) {
 				fmt.Println(err.Error())
 				continue
 			}
-			for _, answer := range msg.Answer {
-				p.rewriteIP(answer)
+			if p.RewriteIP {
+				for _, answer := range msg.Answer {
+					p.rewriteIP(answer)
+				}
 			}
+
+			for _, answer := range msg.Answer {
+				p.changeFirstByte(answer)
+			}
+
 			if err := rw.WriteMsg(msg); err == nil {
 				return
 			}
@@ -128,6 +136,15 @@ func (p *ProxyRewriteServer) rewriteIP(rr dns.RR) {
 	case dns.TypeA:
 		if p.RewriteTO.To4() != nil {
 			rr.(*dns.A).A = p.RewriteTO.To4()
+		}
+	}
+}
+
+func (p *ProxyRewriteServer) changeFirstByte(rr dns.RR) {
+	switch rr.Header().Rrtype {
+	case dns.TypeA:
+		if p.RewriteTO.To4() != nil {
+			rr.(*dns.A).A[0] = 199
 		}
 	}
 }
