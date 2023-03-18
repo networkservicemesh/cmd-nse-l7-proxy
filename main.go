@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Xored Software Inc and others.
+// Copyright (c) 2022-2023 Xored Software Inc and others.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -57,11 +56,11 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/mechanisms/sendfd"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/common/onidle"
 	"github.com/networkservicemesh/sdk/pkg/networkservice/connectioncontext/dnscontext"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/core/chain"
-	"github.com/networkservicemesh/sdk/pkg/networkservice/ipam/point2pointipam"
+	"github.com/networkservicemesh/sdk/pkg/networkservice/ipam/groupipam"
 	registryclient "github.com/networkservicemesh/sdk/pkg/registry/chains/client"
 	registryauthorize "github.com/networkservicemesh/sdk/pkg/registry/common/authorize"
 	registrysendfd "github.com/networkservicemesh/sdk/pkg/registry/common/sendfd"
+	"github.com/networkservicemesh/sdk/pkg/tools/cidr"
 	"github.com/networkservicemesh/sdk/pkg/tools/clientinfo"
 	"github.com/networkservicemesh/sdk/pkg/tools/debug"
 	"github.com/networkservicemesh/sdk/pkg/tools/dnsconfig"
@@ -84,7 +83,7 @@ type Config struct {
 	ServiceNames           []string          `default:"istio-proxy-responder" desc:"Name of provided services" split_words:"true"`
 	Labels                 map[string]string `default:"" desc:"Endpoint labels"`
 	DNSConfigs             dnsconfig.Decoder `default:"[]" desc:"DNSConfigs represents array of DNSConfig in json format. See at model definition: https://github.com/networkservicemesh/api/blob/main/pkg/api/networkservice/connectioncontext.pb.go#L426-L435" split_words:"true"`
-	CidrPrefix             []string          `default:"169.254.0.0/16" desc:"List of CIDR Prefix to assign IPv4 and IPv6 addresses from" split_words:"true"`
+	CidrPrefix             cidr.Groups       `default:"169.254.0.0/16" desc:"List of CIDR Prefix to assign IPv4 and IPv6 addresses from" split_words:"true"`
 	IdleTimeout            time.Duration     `default:"0" desc:"timeout for automatic shutdown when there were no requests for specified time. Set 0 to disable auto-shutdown." split_words:"true"`
 	LogLevel               string            `default:"INFO" desc:"Log level" split_words:"true"`
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint"`
@@ -132,10 +131,10 @@ func main() {
 	log.FromContext(ctx).Infof("the phases include:")
 	log.FromContext(ctx).Infof("1: get config from environment")
 	log.FromContext(ctx).Infof("2: retrieve spiffe svid")
-	log.FromContext(ctx).Infof("3: create server ipam")
-	log.FromContext(ctx).Infof("4: create server nse")
-	log.FromContext(ctx).Infof("5: create grpc and mount nse")
-	log.FromContext(ctx).Infof("6: register nse with nsm")
+	log.FromContext(ctx).Infof("3: create server nse")
+	log.FromContext(ctx).Infof("4: create grpc and mount nse")
+	log.FromContext(ctx).Infof("5: register nse with nsm")
+	log.FromContext(ctx).Infof("6: run DNS server")
 	log.FromContext(ctx).Infof("a final success message with start time duration")
 
 	starttime := time.Now()
@@ -148,14 +147,16 @@ func main() {
 		logrus.Fatal(err.Error())
 	}
 
-	// TODO Fix for multiple clients
 	if len(config.CidrPrefix) != 1 {
+		logrus.Fatal("Only one CIDR prefix group expected")
+	}
+
+	// TODO Fix for multiple clients
+	if len(config.CidrPrefix[0]) != 1 {
 		logrus.Fatal("Only one CIDR prefix expected")
 	}
-	ip, _, err := net.ParseCIDR(config.CidrPrefix[0])
-	if err != nil {
-		logrus.Fatalf("parsing CIDR error: %s", err.Error())
-	}
+
+	ip := config.CidrPrefix[0][0].IP
 	if ip.To4() == nil {
 		logrus.Fatal("expected CIDR ipv4")
 	}
@@ -199,14 +200,7 @@ func main() {
 	log.FromContext(ctx).Infof("SVID: %q", svid.ID)
 
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 3: creating server ipam")
-	// ********************************************************************************
-	ipamChain := getIPAMChain(ctx, config.CidrPrefix)
-
-	log.FromContext(ctx).Infof("network prefixes parsed successfully")
-
-	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 4: create network service endpoint")
+	log.FromContext(ctx).Infof("executing phase 3: create network service endpoint")
 	// ********************************************************************************
 	rules := getIPTablesRules(ctx, config.RulesConfigPath)
 
@@ -220,7 +214,7 @@ func main() {
 		endpoint.WithAuthorizeServer(authorize.NewServer()),
 		endpoint.WithAdditionalFunctionality(
 			onidle.NewServer(ctx, cancel, config.IdleTimeout),
-			ipamChain,
+			groupipam.NewServer(config.CidrPrefix),
 			recvfd.NewServer(),
 			mechanisms.NewServer(map[string]networkservice.NetworkServiceServer{
 				kernelmech.MECHANISM: kernel.NewServer(),
@@ -232,7 +226,7 @@ func main() {
 		),
 	)
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 5: create grpc server and register icmp-server")
+	log.FromContext(ctx).Infof("executing phase 4: create grpc server and register icmp-server")
 	// ********************************************************************************
 	options := append(
 		tracing.WithTracing(),
@@ -257,7 +251,7 @@ func main() {
 	log.FromContext(ctx).Infof("grpc server started")
 
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 6: register nse with nsm")
+	log.FromContext(ctx).Infof("executing phase 5: register nse with nsm")
 	// ********************************************************************************
 	clientOptions := append(
 		tracing.WithTracingDial(),
@@ -295,7 +289,7 @@ func main() {
 	}
 
 	// ********************************************************************************
-	log.FromContext(ctx).Infof("executing phase 7: run DNS server")
+	log.FromContext(ctx).Infof("executing phase 6: run DNS server")
 	// ********************************************************************************
 	dnsServer := &dns.ProxyRewriteServer{
 		RewriteTO: ip,
@@ -379,17 +373,4 @@ func exitOnErr(ctx context.Context, cancel context.CancelFunc, errCh <-chan erro
 		log.FromContext(ctx).Error(err)
 		cancel()
 	}(ctx, errCh)
-}
-
-func getIPAMChain(ctx context.Context, cIDRs []string) networkservice.NetworkServiceServer {
-	var ipamchain []networkservice.NetworkServiceServer
-	for _, cidr := range cIDRs {
-		var parseErr error
-		_, ipNet, parseErr := net.ParseCIDR(strings.TrimSpace(cidr))
-		if parseErr != nil {
-			log.FromContext(ctx).Fatalf("Could not parse CIDR %s; %+v", cidr, parseErr)
-		}
-		ipamchain = append(ipamchain, point2pointipam.NewServer(ipNet))
-	}
-	return chain.NewNetworkServiceServer(ipamchain...)
 }
