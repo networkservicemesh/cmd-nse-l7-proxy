@@ -9,7 +9,7 @@ require (
 	github.com/miekg/dns v1.1.50
 	github.com/networkservicemesh/api v1.7.2-0.20230123083145-4a6c3ec589e1
 	github.com/networkservicemesh/sdk v0.5.1-0.20230518132831-ad70c1f00af9
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20230615234339-61983f687ef7
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20230619140403-8f248dc329bc
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spiffe/go-spiffe/v2 v2.0.0
