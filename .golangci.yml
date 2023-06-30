@@ -127,7 +127,6 @@ linters-settings:
 linters:
   disable-all: true
   enable:
-    # - rowserrcheck
     - goheader
     - bodyclose
     - deadcode
@@ -147,7 +146,6 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    # - lll
     - misspell
     - nakedret
     - exportloopref
@@ -157,7 +155,6 @@ linters:
     - typecheck
     - unconvert
     - unparam
-    # - unused
     - varcheck
     - whitespace
 issues:
