@@ -3,7 +3,6 @@ package imports
 
 import (
 	_ "context"
-	_ "errors"
 	_ "fmt"
 	_ "github.com/antonfisher/nested-logrus-formatter"
 	_ "github.com/edwarnicke/grpcfd"
