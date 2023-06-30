@@ -3,7 +3,6 @@ package imports
 
 import (
 	_ "context"
-	_ "errors"
 	_ "fmt"
 	_ "github.com/antonfisher/nested-logrus-formatter"
 	_ "github.com/edwarnicke/grpcfd"
@@ -44,7 +43,6 @@ import (
 	_ "google.golang.org/grpc"
 	_ "google.golang.org/grpc/credentials"
 	_ "gopkg.in/yaml.v2"
-	_ "io/ioutil"
 	_ "net"
 	_ "net/url"
 	_ "os"

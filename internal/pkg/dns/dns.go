@@ -1,4 +1,6 @@
-// Copyright (c) 2022 Xored Software Inc and others.
+// Copyright (c) 2022-2023 Xored Software Inc and others.
+//
+// Copyright (c) 2023 Cisco Software Inc and others.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -22,11 +24,12 @@ package dns
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/miekg/dns"
 )

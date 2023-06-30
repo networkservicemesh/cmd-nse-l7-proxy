@@ -1,4 +1,6 @@
-// Copyright (c) 2022 Xored Software Inc and others.
+// Copyright (c) 2022-2023 Xored Software Inc and others.
+//
+// Copyright (c) 2023 Cisco Software Inc and others.
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -22,7 +24,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -246,7 +247,7 @@ func main() {
 	)
 	server := grpc.NewServer(options...)
 	responderEndpoint.Register(server)
-	tmpDir, err := ioutil.TempDir("", config.Name)
+	tmpDir, err := os.MkdirTemp("", config.Name)
 	if err != nil {
 		logrus.Fatalf("error creating tmpDir %+v", err)
 	}
@@ -349,7 +350,7 @@ func getIPTablesRules(ctx context.Context, path string) []string {
 		"-A NSM_POSTROUTING -j SNAT --to-source {{ index .NsmDstIPs 0 }}",
 		"-A POSTROUTING -p tcp -o {{ .NsmInterfaceName }} -j NSM_POSTROUTING",
 	}
-	cfg, err := ioutil.ReadFile(filepath.Clean(path))
+	cfg, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		log.FromContext(ctx).Errorf("Could not read IP tables config: %v", err)
 		return defaultRules
