@@ -22,11 +22,12 @@ package dns
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/miekg/dns"
 )
