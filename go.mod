@@ -7,9 +7,9 @@ require (
 	github.com/edwarnicke/grpcfd v1.1.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/miekg/dns v1.1.50
-	github.com/networkservicemesh/api v1.13.1-0.20240424210452-d0df98851760
-	github.com/networkservicemesh/sdk v0.5.1-0.20240812103952-7e0cf2c383fb
-	github.com/networkservicemesh/sdk-kernel v0.0.0-20240812104217-1db554f7fb47
+	github.com/networkservicemesh/api v1.13.4-0.20240814093907-03f6633c2677
+	github.com/networkservicemesh/sdk v0.5.1-0.20240814134105-78bedfb4371f
+	github.com/networkservicemesh/sdk-kernel v0.0.0-20240814134341-a23cb71779da
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spiffe/go-spiffe/v2 v2.1.7
