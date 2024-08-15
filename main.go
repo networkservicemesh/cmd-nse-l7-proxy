@@ -1,6 +1,6 @@
 // Copyright (c) 2022-2023 Xored Software Inc and others.
 //
-// Copyright (c) 2023 Cisco Software Inc and others.
+// Copyright (c) 2023-2024 Cisco Software Inc and others.
 //
 // Copyright (c) 2024 Nordix Foundation.
 //
@@ -71,6 +71,7 @@ import (
 	"github.com/networkservicemesh/sdk/pkg/tools/log"
 	"github.com/networkservicemesh/sdk/pkg/tools/log/logruslogger"
 	"github.com/networkservicemesh/sdk/pkg/tools/opentelemetry"
+	"github.com/networkservicemesh/sdk/pkg/tools/pprofutils"
 	"github.com/networkservicemesh/sdk/pkg/tools/spiffejwt"
 	"github.com/networkservicemesh/sdk/pkg/tools/token"
 	"github.com/networkservicemesh/sdk/pkg/tools/tracing"
@@ -92,6 +93,8 @@ type Config struct {
 	OpenTelemetryEndpoint  string            `default:"otel-collector.observability.svc.cluster.local:4317" desc:"OpenTelemetry Collector Endpoint" split_words:"true"`
 	MetricsExportInterval  time.Duration     `default:"10s" desc:"interval between mertics exports" split_words:"true"`
 	RulesConfigPath        string            `default:"" desc:"Path to a configmap with iptables rules" split_words:"true"`
+	PprofEnabled           bool              `default:"false" desc:"is pprof enabled" split_words:"true"`
+	PprofListenOn          string            `default:"localhost:6060" desc:"pprof URL to ListenAndServe" split_words:"true"`
 }
 
 // Process prints and processes env to config
@@ -184,6 +187,13 @@ func main() {
 				log.FromContext(ctx).Error(err.Error())
 			}
 		}()
+	}
+
+	// ********************************************************************************
+	// Configure pprof
+	// ********************************************************************************
+	if config.PprofEnabled {
+		go pprofutils.ListenAndServe(ctx, config.PprofListenOn)
 	}
 
 	// ********************************************************************************
